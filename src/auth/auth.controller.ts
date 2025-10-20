@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, Ip, Post, Req, Res } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginBodyDto } from './dto/login-body.dto';
@@ -27,5 +28,10 @@ export class AuthController {
     @Post('logout')
     async logout(@Res({ passthrough: true }) res: Response, @Req() req: Request) {
         return this.authService.logout(res, req);
+    }
+
+    @Cron(CronExpression.EVERY_DAY_AT_NOON)
+    async handleExpiredSessionsCleanup() {
+        await this.authService.deleteExpiredSessions();
     }
 }

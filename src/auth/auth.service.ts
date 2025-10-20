@@ -272,4 +272,18 @@ export class AuthService {
             message: "Logout successful",
         };
     }
+
+    async deleteExpiredSessions(): Promise<{ message: string }> {
+        await this.prismaService.session.deleteMany({
+            where: {
+                expiresAt: {
+                    lt: new Date()
+                }
+            }
+        });
+
+        return {
+            message: "Expired sessions cleaned up successfully",
+        };
+    }
 }
