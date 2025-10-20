@@ -8,16 +8,20 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     cors: {
       origin: [`${process.env.API_URL}`],
-      methods: "GET,PUT,PATCH,POST,DELETE",
-      credentials: true
-    }
+      methods: 'GET,PUT,PATCH,POST,DELETE',
+      credentials: true,
+    },
   });
 
   const config = new DocumentBuilder()
     .setTitle('API Documentation')
     .setDescription('API Description')
     .setVersion('1.0')
-    .setContact('Michinix', 'https://michelmarcotte.fr', 'marcotte.michel@orange.fr')
+    .setContact(
+      'Michinix',
+      'https://michelmarcotte.fr',
+      'marcotte.michel@orange.fr',
+    )
     .addBearerAuth()
     .build();
 

@@ -23,4 +23,4 @@ import { SupplierModule } from './supplier/supplier.module';
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })
-export class AppModule { }
+export class AppModule {}

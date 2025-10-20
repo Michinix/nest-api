@@ -6,6 +6,6 @@ export class AppService {
     return {
       message: 'Welcome to the NestJS API!',
       documentation: `${process.env.APP_URL}/api/docs`,
-    }
+    };
   }
 }

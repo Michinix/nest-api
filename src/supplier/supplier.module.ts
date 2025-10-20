@@ -5,6 +5,6 @@ import { SupplierService } from './supplier.service';
 
 @Module({
   controllers: [SupplierController],
-  providers: [SupplierService, PrismaService]
+  providers: [SupplierService, PrismaService],
 })
-export class SupplierModule { }
+export class SupplierModule {}

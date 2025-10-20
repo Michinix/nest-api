@@ -9,4 +9,4 @@ import { ClientService } from './client.service';
   controllers: [ClientController],
   providers: [ClientService, PrismaService],
 })
-export class ClientModule { }
+export class ClientModule {}

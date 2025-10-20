@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -11,282 +15,340 @@ import { RegisterBody } from './dto/register-body.dto';
 
 @Injectable()
 export class AuthService {
-    constructor(
-        private readonly prismaService: PrismaService,
-        private readonly jwtService: JwtService,
-        private readonly configService: ConfigService
-    ) { }
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
-    async login(loginBody: LoginBody, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
-        const { email, password } = loginBody;
+  async login(
+    loginBody: LoginBody,
+    res: Response,
+    req: Request,
+    ip: string,
+  ): Promise<AuthResponseDto> {
+    const { email, password } = loginBody;
 
-        const user = await this.prismaService.user.findUnique({ where: { email }, include: { role: true } });
+    const user = await this.prismaService.user.findUnique({
+      where: { email },
+      include: { role: true },
+    });
 
-        if (!user) throw new NotFoundException("No account found with this email");
+    if (!user) throw new NotFoundException('No account found with this email');
 
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
 
-        if (!isPasswordMatch) throw new UnauthorizedException("Invalid credentials");
+    if (!isPasswordMatch)
+      throw new UnauthorizedException('Invalid credentials');
 
-        const accessToken = await this.jwtService.signAsync({
-            sub: user.uuid,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            role: user.role.name
-        }, {
-            secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
-            expiresIn: '15m',
-        });
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user.uuid,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role.name,
+      },
+      {
+        secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+        expiresIn: '15m',
+      },
+    );
 
-        const refreshToken = await this.jwtService.signAsync({
-            sub: user.uuid
-        }, {
-            secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
-            expiresIn: '7d',
-        });
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        sub: user.uuid,
+      },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+        expiresIn: '7d',
+      },
+    );
 
-        const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
-        await this.prismaService.session.create({
-            data: {
-                userId: user.id,
-                refreshToken: refreshTokenHash,
-                ipAddress: ip,
-                userAgent: req.headers['user-agent'] ?? 'Unknown',
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-            }
-        })
+    await this.prismaService.session.create({
+      data: {
+        userId: user.id,
+        refreshToken: refreshTokenHash,
+        ipAddress: ip,
+        userAgent: req.headers['user-agent'] ?? 'Unknown',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
 
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000, // 15 minutes
-        });
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
 
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
-        return {
-            message: "Login successful",
-            data: {
-                user: {
-                    uuid: user.uuid,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    email: user.email,
-                    role: user.role.name,
-                    createdAt: user.createdAt,
-                }
-            }
-        };
-    }
-
-    async register(registerBody: RegisterBody, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
-        const { firstName, lastName, email, password } = registerBody;
-
-        const existingUser = await this.prismaService.user.findUnique({ where: { email } });
-
-        if (existingUser) throw new UnauthorizedException("An account with this email already exists");
-
-        const hashedPassword = await bcrypt.hash(password, 12);
-
-        await this.prismaService.user.create({
-            data: {
-                firstName,
-                lastName,
-                email,
-                password: hashedPassword,
-                role: {
-                    connect: { name: 'USER' }
-                }
-            }
-        });
-
-        const user = await this.prismaService.user.findUnique({
-            where: { email },
-            include: {
-                role: true,
-            }
-        });
-
-        if (!user) throw new NotFoundException("No account found with this email");
-
-        const accessToken = await this.jwtService.signAsync({
-            sub: user.uuid,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            role: user.role.name
-        }, {
-            secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
-            expiresIn: '15m',
-        });
-
-        const refreshToken = await this.jwtService.signAsync({
-            sub: user.uuid
-        }, {
-            secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
-            expiresIn: '7d',
-        });
-
-        const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-
-        await this.prismaService.session.create({
-            data: {
-                userId: user.id,
-                refreshToken: refreshTokenHash,
-                ipAddress: ip,
-                userAgent: req.headers['user-agent'] ?? 'Unknown',
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-            }
-        });
-
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000, // 15 minutes
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
-
-        return {
-            message: "Registration successful",
-            data: {
-                user: {
-                    uuid: user.uuid,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    email: user.email,
-                    role: user.role.name,
-                    createdAt: user.createdAt,
-                }
-            }
-        };
+    return {
+      message: 'Login successful',
+      data: {
+        user: {
+          uuid: user.uuid,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role.name,
+          createdAt: user.createdAt,
+        },
+      },
     };
+  }
 
-    async refreshToken(res: Response, req: Request, ip: string): Promise<{ message: string, data: { sessionId: string } }> {
-        const refreshToken = req.cookies['refreshToken'];
+  async register(
+    registerBody: RegisterBody,
+    res: Response,
+    req: Request,
+    ip: string,
+  ): Promise<AuthResponseDto> {
+    const { firstName, lastName, email, password } = registerBody;
 
-        if (!refreshToken) throw new UnauthorizedException("No refresh token provided");
+    const existingUser = await this.prismaService.user.findUnique({
+      where: { email },
+    });
 
-        const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    if (existingUser)
+      throw new UnauthorizedException(
+        'An account with this email already exists',
+      );
 
-        const session = await this.prismaService.session.findFirst({
-            where: {
-                refreshToken: refreshTokenHash,
-                expiresAt: {
-                    gt: new Date()
-                }
-            },
-            include: {
-                user: {
-                    include: {
-                        role: true
-                    }
-                }
-            }
-        });
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-        if (!session) throw new UnauthorizedException("Invalid or expired refresh token");
+    await this.prismaService.user.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        role: {
+          connect: { name: 'USER' },
+        },
+      },
+    });
 
-        await this.prismaService.session.delete({ where: { id: session.id } });
+    const user = await this.prismaService.user.findUnique({
+      where: { email },
+      include: {
+        role: true,
+      },
+    });
 
-        const newAccessToken = await this.jwtService.signAsync({
-            sub: session.user.uuid,
-            firstName: session.user.firstName,
-            lastName: session.user.lastName,
-            email: session.user.email,
-            role: session.user.role.name
-        }, {
-            secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
-            expiresIn: '15m',
-        });
+    if (!user) throw new NotFoundException('No account found with this email');
 
-        const newRefreshToken = await this.jwtService.signAsync({
-            sub: session.user.uuid
-        }, {
-            secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
-            expiresIn: '7d',
-        });
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user.uuid,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role.name,
+      },
+      {
+        secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+        expiresIn: '15m',
+      },
+    );
 
-        const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+    const refreshToken = await this.jwtService.signAsync(
+      {
+        sub: user.uuid,
+      },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+        expiresIn: '7d',
+      },
+    );
 
-        await this.prismaService.session.create({
-            data: {
-                userId: session.user.id,
-                refreshToken: newRefreshTokenHash,
-                ipAddress: ip,
-                userAgent: req.headers['user-agent'] ?? 'Unknown',
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-            }
-        });
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
-        res.cookie('accessToken', newAccessToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000, // 15 minutes
-        });
+    await this.prismaService.session.create({
+      data: {
+        userId: user.id,
+        refreshToken: refreshTokenHash,
+        ipAddress: ip,
+        userAgent: req.headers['user-agent'] ?? 'Unknown',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
 
-        res.cookie('refreshToken', newRefreshToken, {
-            httpOnly: true,
-            secure: this.configService.get<string>('NODE_ENV') === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
 
-        return {
-            message: "Token refreshed successfully",
-            data: {
-                sessionId: session.uuid,
-            }
-        }
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return {
+      message: 'Registration successful',
+      data: {
+        user: {
+          uuid: user.uuid,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role.name,
+          createdAt: user.createdAt,
+        },
+      },
+    };
+  }
+
+  async refreshToken(
+    res: Response,
+    req: Request,
+    ip: string,
+  ): Promise<{ message: string; data: { sessionId: string } }> {
+    const refreshToken = req.cookies['refreshToken'];
+
+    if (!refreshToken)
+      throw new UnauthorizedException('No refresh token provided');
+
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    const session = await this.prismaService.session.findFirst({
+      where: {
+        refreshToken: refreshTokenHash,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        user: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!session)
+      throw new UnauthorizedException('Invalid or expired refresh token');
+
+    await this.prismaService.session.delete({ where: { id: session.id } });
+
+    const newAccessToken = await this.jwtService.signAsync(
+      {
+        sub: session.user.uuid,
+        firstName: session.user.firstName,
+        lastName: session.user.lastName,
+        email: session.user.email,
+        role: session.user.role.name,
+      },
+      {
+        secret: this.configService.get<string>('JWT_ACCESS_TOKEN_SECRET'),
+        expiresIn: '15m',
+      },
+    );
+
+    const newRefreshToken = await this.jwtService.signAsync(
+      {
+        sub: session.user.uuid,
+      },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
+        expiresIn: '7d',
+      },
+    );
+
+    const newRefreshTokenHash = crypto
+      .createHash('sha256')
+      .update(newRefreshToken)
+      .digest('hex');
+
+    await this.prismaService.session.create({
+      data: {
+        userId: session.user.id,
+        refreshToken: newRefreshTokenHash,
+        ipAddress: ip,
+        userAgent: req.headers['user-agent'] ?? 'Unknown',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return {
+      message: 'Token refreshed successfully',
+      data: {
+        sessionId: session.uuid,
+      },
+    };
+  }
+
+  async logout(res: Response, req: Request): Promise<{ message: string }> {
+    const refreshToken = req.cookies['refreshToken'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided');
     }
 
-    async logout(res: Response, req: Request): Promise<{ message: string }> {
-        const refreshToken = req.cookies['refreshToken'];
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
-        if (!refreshToken) {
-            throw new UnauthorizedException("No refresh token provided");
-        }
+    await this.prismaService.session.deleteMany({
+      where: { refreshToken: refreshTokenHash },
+    });
 
-        const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
 
-        await this.prismaService.session.deleteMany({
-            where: { refreshToken: refreshTokenHash }
-        });
+    return {
+      message: 'Logout successful',
+    };
+  }
 
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+  async deleteExpiredSessions(): Promise<{ message: string }> {
+    await this.prismaService.session.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
 
-        return {
-            message: "Logout successful",
-        };
-    }
-
-    async deleteExpiredSessions(): Promise<{ message: string }> {
-        await this.prismaService.session.deleteMany({
-            where: {
-                expiresAt: {
-                    lt: new Date()
-                }
-            }
-        });
-
-        return {
-            message: "Expired sessions cleaned up successfully",
-        };
-    }
+    return {
+      message: 'Expired sessions cleaned up successfully',
+    };
+  }
 }

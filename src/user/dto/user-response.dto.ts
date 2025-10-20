@@ -1,21 +1,21 @@
-import { Expose } from "class-transformer";
+import { Expose } from 'class-transformer';
 
 export class UserResponseDto {
-    @Expose()
-    uuid: string;
+  @Expose()
+  uuid: string;
 
-    @Expose()
-    firstName: string;
+  @Expose()
+  firstName: string;
 
-    @Expose()
-    lastName: string;
+  @Expose()
+  lastName: string;
 
-    @Expose()
-    email: string;
+  @Expose()
+  email: string;
 
-    @Expose()
-    role: string;
+  @Expose()
+  role: string;
 
-    @Expose()
-    createdAt: Date;
+  @Expose()
+  createdAt: Date;
 }
