@@ -1,9 +1,11 @@
-import { Body, Controller, HttpCode, Ip, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginBody } from './dto/login-body.dto';
 import { RegisterBody } from './dto/register-body.dto';
+import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) { }
@@ -19,6 +21,7 @@ export class AuthController {
         return this.authService.register(registerBody, res, req, ip);
     }
 
+    @UseGuards(JwtRefreshGuard)
     @Post('refresh-token')
     async refreshToken(@Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
         return this.authService.refreshToken(res, req, ip);
