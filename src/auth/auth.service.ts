@@ -6,8 +6,8 @@ import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
-import { LoginBodyDto } from './dto/login-body.dto';
-import { RegisterBodyDto } from './dto/register-body.dto';
+import { LoginBody } from './dto/login-body.dto';
+import { RegisterBody } from './dto/register-body.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,8 +17,8 @@ export class AuthService {
         private readonly configService: ConfigService
     ) { }
 
-    async login(loginBodyDto: LoginBodyDto, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
-        const { email, password } = loginBodyDto;
+    async login(loginBody: LoginBody, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
+        const { email, password } = loginBody;
 
         const user = await this.prismaService.user.findUnique({ where: { email }, include: { role: true } });
 
@@ -87,8 +87,8 @@ export class AuthService {
         };
     }
 
-    async register(registerBodyDto: RegisterBodyDto, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
-        const { firstName, lastName, email, password } = registerBodyDto;
+    async register(registerBody: RegisterBody, res: Response, req: Request, ip: string): Promise<AuthResponseDto> {
+        const { firstName, lastName, email, password } = registerBody;
 
         const existingUser = await this.prismaService.user.findUnique({ where: { email } });
 
@@ -176,7 +176,7 @@ export class AuthService {
         };
     };
 
-    async refreshToken(res: Response, req: Request, ip: string): Promise<{ message: string }> {
+    async refreshToken(res: Response, req: Request, ip: string): Promise<{ message: string, data: { sessionId: string } }> {
         const refreshToken = req.cookies['refreshToken'];
 
         if (!refreshToken) throw new UnauthorizedException("No refresh token provided");
@@ -249,7 +249,10 @@ export class AuthService {
 
         return {
             message: "Token refreshed successfully",
-        };
+            data: {
+                sessionId: session.uuid,
+            }
+        }
     }
 
     async logout(res: Response, req: Request): Promise<{ message: string }> {

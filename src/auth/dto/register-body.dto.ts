@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, IsStrongPassword } from "class-validator";
 
-export class RegisterBodyDto {
+export class RegisterBody {
     @ApiProperty({ example: 'John' })
     @IsNotEmpty({ message: "First name must not be empty." })
     @IsString({ message: "First name must be a string." })

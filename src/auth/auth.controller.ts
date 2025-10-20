@@ -2,22 +2,21 @@ import { Body, Controller, HttpCode, Ip, Post, Req, Res } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginBodyDto } from './dto/login-body.dto';
-import { RegisterBodyDto } from './dto/register-body.dto';
-
+import { LoginBody } from './dto/login-body.dto';
+import { RegisterBody } from './dto/register-body.dto';
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) { }
 
     @Post('login')
-    async login(@Body() loginBodyDto: LoginBodyDto, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
-        return this.authService.login(loginBodyDto, res, req, ip);
+    async login(@Body() loginBody: LoginBody, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
+        return this.authService.login(loginBody, res, req, ip);
     }
 
     @HttpCode(201)
     @Post('register')
-    async register(@Body() registerBodyDto: RegisterBodyDto, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
-        return this.authService.register(registerBodyDto, res, req, ip);
+    async register(@Body() registerBody: RegisterBody, @Res({ passthrough: true }) res: Response, @Req() req: Request, @Ip() ip: string) {
+        return this.authService.register(registerBody, res, req, ip);
     }
 
     @Post('refresh-token')
