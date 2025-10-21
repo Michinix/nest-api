@@ -29,7 +29,7 @@ export class JwtAccessStrategy extends PassportStrategy(
   }
 
   async validate(req: Request, payload: JwtAccessPayload) {
-    const token = req.cookies?.['accessToken'];
+    const token: any = req.cookies?.['accessToken'];
     if (!token) throw new UnauthorizedException('No access token provided');
 
     if (!payload) throw new UnauthorizedException('Invalid access token');
